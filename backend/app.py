@@ -98,17 +98,25 @@ async def summarize_store_local(
     directory_structure = await gh.get_directory_structure_from_url(request.repo_url)
     all_content = await gh.get_all_content_from_url(request.repo_url)
 
-    business_summary, technical_documentation = await asyncio.gather(
-        openai.get_business_summary(directory_structure, all_content),
-        openai.get_technical_documentation(directory_structure, all_content),
-    )
+    # Use Google Gemini for local summarization
+    key_1 = request.gemini_key or key_manager.get_key(KeyGroup.GEMINI)
+    key_2 = request.gemini_key or key_manager.get_key(KeyGroup.GEMINI)
+    
+    try:
+        client_1, client_2 = GoogleGenAI(key_1), GoogleGenAI(key_2)
+        business_summary, technical_documentation = await asyncio.gather(
+            client_1.get_business_summary(directory_structure, all_content),
+            client_2.get_technical_documentation(directory_structure, all_content),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
     # Create output directory if it doesn't exist
-    os.makedirs("tmp/openai", exist_ok=True)
+    os.makedirs("tmp/local", exist_ok=True)
     
-    with open("tmp/openai/business_summary.txt", "w") as f:
+    with open("tmp/local/business_summary.txt", "w") as f:
         f.write(business_summary)
-    with open("tmp/openai/technical_documentation.txt", "w") as f:
+    with open("tmp/local/technical_documentation.txt", "w") as f:
         f.write(technical_documentation)
     
     return JSONResponse(content={"message": "Repository summarized successfully"})

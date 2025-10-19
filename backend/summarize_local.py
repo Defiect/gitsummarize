@@ -6,7 +6,7 @@ Usage:
     python backend/summarize_local.py https://github.com/example-owner/example-repo
 
 Requirements:
-    - Set GITHUB_TOKEN and OPENAI_API_KEY in the script or as environment variables
+    - Set GITHUB_TOKEN and GEMINI_API_KEY in the script or as environment variables
     - Install dependencies: poetry install (from backend directory)
     
 Output:
@@ -26,7 +26,7 @@ from dotenv import load_dotenv
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from gitsummarize.clients.github import GithubClient
-from gitsummarize.clients.openai import OpenAIClient
+from gitsummarize.clients.google_genai import GoogleGenAI
 
 # Configure logging
 logging.basicConfig(
@@ -40,7 +40,7 @@ load_dotenv()
 
 # API Keys - Replace with your actual keys or set as environment variables
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "your_github_token_here")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "your_openai_api_key_here")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY_1", os.getenv("GEMINI_API_KEY", "your_gemini_api_key_here"))
 
 
 def parse_github_url(url: str) -> tuple[str, str]:
@@ -81,12 +81,12 @@ async def summarize_repository(repo_url: str) -> None:
     # Validate API keys
     if GITHUB_TOKEN == "your_github_token_here":
         logger.warning("⚠️  GITHUB_TOKEN not set. Using placeholder. Please set your actual GitHub token.")
-    if OPENAI_API_KEY == "your_openai_api_key_here":
-        logger.warning("⚠️  OPENAI_API_KEY not set. Using placeholder. Please set your actual OpenAI API key.")
+    if GEMINI_API_KEY == "your_gemini_api_key_here":
+        logger.warning("⚠️  GEMINI_API_KEY not set. Using placeholder. Please set your actual Gemini API key.")
     
     # Initialize clients
     gh_client = GithubClient(GITHUB_TOKEN)
-    openai_client = OpenAIClient(OPENAI_API_KEY)
+    gemini_client = GoogleGenAI(GEMINI_API_KEY)
     
     # Parse URL to get owner and repo
     owner, repo = parse_github_url(repo_url)
@@ -99,12 +99,13 @@ async def summarize_repository(repo_url: str) -> None:
     logger.info("Fetching repository content...")
     all_content = await gh_client.get_all_content_from_url(repo_url)
     
-    logger.info("Generating summaries with OpenAI (this may take a while)...")
+    logger.info("Generating summaries with Google Gemini (this may take a while)...")
     
-    # Generate summaries in parallel
+    # Generate summaries in parallel using two separate clients
+    gemini_client_2 = GoogleGenAI(GEMINI_API_KEY)
     business_summary, technical_documentation = await asyncio.gather(
-        openai_client.get_business_summary(directory_structure, all_content),
-        openai_client.get_technical_documentation(directory_structure, all_content),
+        gemini_client.get_business_summary(directory_structure, all_content),
+        gemini_client_2.get_technical_documentation(directory_structure, all_content),
     )
     
     # Create output directory
